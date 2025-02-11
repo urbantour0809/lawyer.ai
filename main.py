@@ -3,6 +3,7 @@ import requests
 import logging
 from dotenv import load_dotenv
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 import uvicorn
 
@@ -20,6 +21,15 @@ logging.basicConfig(
 )
 
 app = FastAPI()
+
+# ✅ CORS 설정 추가 (다른 컴퓨터에서 요청 허용)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # 🔥 모든 도메인에서 접근 허용 (보안상 필요하면 특정 도메인만 허용)
+    allow_credentials=True,
+    allow_methods=["*"],  # 모든 HTTP 메서드 허용 (OPTIONS 포함)
+    allow_headers=["*"],  # 모든 헤더 허용
+)
 
 # ✅ 요청 받을 데이터 모델 정의
 class QueryRequest(BaseModel):
