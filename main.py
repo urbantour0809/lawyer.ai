@@ -38,6 +38,11 @@ class QueryRequest(BaseModel):
 # ✅ 환경 변수에서 로컬 GPU 서버 주소 가져오기
 LOCAL_GPU_SERVER = os.getenv("LOCAL_GPU_SERVER")
 
+# ✅ URL 스키마 자동 추가 (http:// 또는 https:// 없으면 추가)
+if LOCAL_GPU_SERVER and not LOCAL_GPU_SERVER.startswith(("http://", "https://")):
+    LOCAL_GPU_SERVER = "http://" + LOCAL_GPU_SERVER
+    logging.warning(f"⚠️ LOCAL_GPU_SERVER에 스키마가 없어서 자동으로 추가됨: {LOCAL_GPU_SERVER}")
+
 # ✅ 서버 상태 확인용 GET 엔드포인트 추가 (Cloudtype 호환)
 @app.get("/health")
 @app.get("/healthz")  # Cloudtype 헬스체크 대응
@@ -50,7 +55,7 @@ def health_check():
 async def ask_question(request: QueryRequest, client_request: Request):
     user_query = request.question.strip()
     client_ip = client_request.client.host  # 요청한 클라이언트 IP 가져오기
-    
+
     logging.info(f"📝 [{client_ip}] 질문 받음: {user_query}")
 
     if not user_query:
@@ -64,11 +69,11 @@ async def ask_question(request: QueryRequest, client_request: Request):
             "debug_info": os.environ  # 디버깅을 위해 환경 변수 정보 추가
         }
 
-    try:
-        target_url = f"{LOCAL_GPU_SERVER}/gpu_ask"
-        logging.info(f"🔄 [{client_ip}] 로컬 GPU 서버로 요청 전송: {target_url}")
+    target_url = f"{LOCAL_GPU_SERVER}/gpu_ask"
+    logging.info(f"🔄 [{client_ip}] 로컬 GPU 서버로 요청 전송: {target_url}")
 
-        response = requests.post(target_url, json={"question": user_query})
+    try:
+        response = requests.post(target_url, json={"question": user_query}, timeout=10)
 
         if response.status_code == 200:
             logging.info(f"✅ [{client_ip}] 로컬 GPU 서버 응답 성공")
@@ -76,6 +81,14 @@ async def ask_question(request: QueryRequest, client_request: Request):
         else:
             logging.error(f"❌ [{client_ip}] 로컬 GPU 서버 응답 실패 - 상태 코드: {response.status_code}")
             return {"error": f"로컬 GPU 서버 오류: {response.status_code}", "details": response.text}
+
+    except requests.exceptions.ConnectionError:
+        logging.exception(f"❌ [{client_ip}] 로컬 GPU 서버에 연결할 수 없음")
+        return {"error": "로컬 GPU 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요."}
+
+    except requests.exceptions.Timeout:
+        logging.exception(f"❌ [{client_ip}] 로컬 GPU 서버 응답 시간 초과")
+        return {"error": "로컬 GPU 서버 응답 시간이 초과되었습니다."}
 
     except requests.exceptions.RequestException as e:
         logging.exception(f"❌ [{client_ip}] 로컬 GPU 서버 요청 실패")
