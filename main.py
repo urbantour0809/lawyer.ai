@@ -25,7 +25,7 @@ app = FastAPI()
 # ✅ CORS 설정 추가 (다른 컴퓨터에서 요청 허용)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 🔥 모든 도메인에서 접근 허용 (보안상 필요하면 특정 도메인만 허용)
+    allow_origins=["*"],  # 🔥 모든 도메인에서 접근 허용 (보안이 필요하면 특정 도메인만 허용)
     allow_credentials=True,
     allow_methods=["*"],  # 모든 HTTP 메서드 허용 (OPTIONS 포함)
     allow_headers=["*"],  # 모든 헤더 허용
@@ -73,7 +73,7 @@ async def ask_question(request: QueryRequest, client_request: Request):
     logging.info(f"🔄 [{client_ip}] 로컬 GPU 서버로 요청 전송: {target_url}")
 
     try:
-        response = requests.post(target_url, json={"question": user_query}, timeout=10)
+        response = requests.post(target_url, json={"question": user_query}, timeout=30)
 
         if response.status_code == 200:
             logging.info(f"✅ [{client_ip}] 로컬 GPU 서버 응답 성공")
