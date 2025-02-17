@@ -48,6 +48,10 @@ if LOCAL_GPU_SERVER and not LOCAL_GPU_SERVER.startswith(("http://", "https://"))
     logging.warning(f"⚠️ LOCAL_GPU_SERVER에 스키마가 없어서 자동 추가됨: {LOCAL_GPU_SERVER}")
 
 # ✅ 요청 받을 데이터 모델 정의
+class QueryRequest(BaseModel):
+    question: str
+
+# ✅ 요청 받을 데이터 모델 정의
 class ContractRequest(BaseModel):
     contract_type: str
     party_a: str
@@ -61,6 +65,37 @@ class ContractRequest(BaseModel):
 def health_check():
     logging.info("✅ Health Check 요청 받음")
     return {"status": "OK", "message": "FastAPI 로컬 서버가 정상적으로 실행 중입니다."}
+
+# ✅ 질문을 받아 로컬 GPU 서버로 요청을 전달하는 엔드포인트
+@app.post("/ask")
+async def ask_question(request: QueryRequest):
+    user_query = request.question.strip()
+    logging.info(f"📝 질문 받음: {user_query}")
+
+    if not user_query:
+        logging.warning("⚠️ 빈 질문 입력됨")
+        return {"error": "질문을 입력하세요."}
+
+    if not LOCAL_GPU_SERVER:
+        logging.error("❌ LOCAL_GPU_SERVER 환경 변수가 설정되지 않음")
+        return {"error": "서버 설정 오류: LOCAL_GPU_SERVER 환경 변수가 없습니다."}
+
+    target_url = f"{LOCAL_GPU_SERVER}/gpu_ask"
+    logging.info(f"🔄 로컬 GPU 서버로 요청 전송: {target_url}")
+
+    try:
+        response = requests.post(target_url, json={"question": user_query}, timeout=180)
+
+        if response.status_code == 200:
+            logging.info(f"✅ 로컬 GPU 서버 응답 성공")
+            return response.json()
+        else:
+            logging.error(f"❌ 로컬 GPU 서버 응답 실패 - 상태 코드: {response.status_code}")
+            return {"error": f"로컬 GPU 서버 오류: {response.status_code}", "details": response.text}
+
+    except requests.exceptions.RequestException as e:
+        logging.exception("❌ 로컬 GPU 서버 요청 실패")
+        return {"error": f"로컬 GPU 서버 요청 실패: {e}"}
 
 # ✅ 문서 생성 요청을 로컬 GPU 서버에서 처리
 @app.post("/generate-document")
