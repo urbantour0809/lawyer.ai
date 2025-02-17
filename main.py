@@ -37,6 +37,16 @@ app.add_middleware(
 DOWNLOAD_DIR = os.path.abspath("download")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
+# ✅ 로컬 GPU 서버 (ngrok URL) 가져오기
+LOCAL_GPU_SERVER = os.getenv("LOCAL_GPU_SERVER", "").strip()
+
+if not LOCAL_GPU_SERVER:
+    logging.error("❌ LOCAL_GPU_SERVER 환경 변수가 설정되지 않음!")
+
+if LOCAL_GPU_SERVER and not LOCAL_GPU_SERVER.startswith(("http://", "https://")):
+    LOCAL_GPU_SERVER = "http://" + LOCAL_GPU_SERVER
+    logging.warning(f"⚠️ LOCAL_GPU_SERVER에 스키마가 없어서 자동 추가됨: {LOCAL_GPU_SERVER}")
+
 # ✅ 요청 받을 데이터 모델 정의
 class ContractRequest(BaseModel):
     contract_type: str
@@ -52,18 +62,31 @@ def health_check():
     logging.info("✅ Health Check 요청 받음")
     return {"status": "OK", "message": "FastAPI 로컬 서버가 정상적으로 실행 중입니다."}
 
-# ✅ 문서 생성 요청을 로컬 서버에서 처리
+# ✅ 문서 생성 요청을 로컬 GPU 서버에서 처리
 @app.post("/generate-document")
 async def generate_document(request: ContractRequest):
-    """✅ 로컬에서 PDF 문서를 생성"""
+    """✅ 로컬 GPU 서버에 문서 생성 요청 전송"""
     logging.info(f"📄 문서 생성 요청 받음: {request}")
 
-    # ✅ 서버 내부에서 직접 `/generate-document` 호출
+    if not LOCAL_GPU_SERVER:
+        return {"error": "서버 설정 오류: LOCAL_GPU_SERVER 환경 변수가 없습니다."}
+
+    target_url = f"{LOCAL_GPU_SERVER}/generate-document"
+    logging.info(f"🔄 로컬 GPU 서버로 문서 생성 요청 전송: {target_url}")
+
     try:
-        response = requests.post("http://127.0.0.1:8000/generate-document", json=request.dict(), timeout=300)
+        response = requests.post(target_url, json=request.model_dump(), timeout=300)
 
         if response.status_code == 200:
-            return response.json()
+            result = response.json()
+
+            # ✅ 다운로드 링크 수정 (localhost → ngrok URL)
+            if "download_link" in result:
+                result["download_link"] = result["download_link"].replace("http://localhost:8001", LOCAL_GPU_SERVER)
+                logging.info(f"🔗 수정된 다운로드 링크: {result['download_link']}")
+
+            return result
+
         else:
             return {"error": f"문서 생성 오류: {response.status_code}", "details": response.text}
 
