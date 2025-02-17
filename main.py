@@ -35,6 +35,13 @@ app.add_middleware(
 class QueryRequest(BaseModel):
     question: str
 
+class ContractRequest(BaseModel):
+    contract_type: str
+    party_a: str
+    party_b: str
+    contract_date: str
+    additional_info: str = ""
+
 # ✅ 환경 변수에서 로컬 GPU 서버 주소 가져오기
 LOCAL_GPU_SERVER = os.getenv("LOCAL_GPU_SERVER")
 
@@ -91,6 +98,41 @@ async def ask_question(request: QueryRequest):
     except requests.exceptions.RequestException as e:
         logging.exception("❌ 로컬 GPU 서버 요청 실패")
         return {"error": f"로컬 GPU 서버 요청 실패: {e}"}
+
+# ✅ 문서 생성 요청을 로컬 GPU 서버로 전달하는 엔드포인트 추가
+@app.post("/generate-document")
+async def generate_document(request: ContractRequest):
+    logging.info(f"📄 문서 생성 요청 받음: {request}")
+
+    if not LOCAL_GPU_SERVER:
+        logging.error("❌ LOCAL_GPU_SERVER 환경 변수가 설정되지 않음")
+        return {"error": "서버 설정 오류: LOCAL_GPU_SERVER 환경 변수가 없습니다."}
+
+    # ✅ 로컬 GPU 서버의 문서 생성 API 호출
+    target_url = f"{LOCAL_GPU_SERVER}/generate-document"
+    logging.info(f"🔄 로컬 GPU 서버로 문서 생성 요청 전송: {target_url}")
+
+    try:
+        response = requests.post(target_url, json=request.dict(), timeout=60)
+
+        if response.status_code == 200:
+            logging.info(f"✅ 문서 생성 성공")
+            return response.json()
+        else:
+            logging.error(f"❌ 문서 생성 실패 - 상태 코드: {response.status_code}")
+            return {"error": f"문서 생성 오류: {response.status_code}", "details": response.text}
+
+    except requests.exceptions.ConnectionError:
+        logging.exception("❌ 로컬 GPU 서버에 연결할 수 없음")
+        return {"error": "로컬 GPU 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요."}
+
+    except requests.exceptions.Timeout:
+        logging.exception("❌ 로컬 GPU 서버 응답 시간 초과")
+        return {"error": "로컬 GPU 서버 응답 시간이 초과되었습니다."}
+
+    except requests.exceptions.RequestException as e:
+        logging.exception("❌ 문서 생성 요청 실패")
+        return {"error": f"문서 생성 요청 실패: {e}"}
 
 # ✅ Cloudtype에서 실행
 if __name__ == "__main__":
