@@ -4,7 +4,7 @@ import logging
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pydantic import BaseModel
 import uvicorn
 
@@ -21,7 +21,8 @@ logging.basicConfig(
     ]
 )
 
-app = FastAPI()
+# ✅ FastAPI 인스턴스 생성 (root_path 설정 추가)
+app = FastAPI(root_path="/")
 
 # ✅ CORS 설정 추가
 app.add_middleware(
@@ -36,7 +37,7 @@ app.add_middleware(
 DOWNLOAD_DIR = os.path.abspath("download")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
 
-# ✅ `ContractRequest` 모델 추가 (서버와 동일한 모델 필요)
+# ✅ 요청 받을 데이터 모델 정의
 class ContractRequest(BaseModel):
     contract_type: str
     party_a: str
@@ -54,7 +55,8 @@ if LOCAL_GPU_SERVER and not LOCAL_GPU_SERVER.startswith(("http://", "https://"))
     LOCAL_GPU_SERVER = "http://" + LOCAL_GPU_SERVER
     logging.warning(f"⚠️ LOCAL_GPU_SERVER에 스키마가 없어서 자동 추가됨: {LOCAL_GPU_SERVER}")
 
-# ✅ 서버 상태 확인 엔드포인트
+# ✅ 서버 상태 확인 엔드포인트 (Cloudtype에서 `/healthz`를 찾을 수 있도록 추가)
+@app.get("/healthz")
 @app.get("/health")
 def health_check():
     logging.info("✅ Health Check 요청 받음")
@@ -83,6 +85,23 @@ async def generate_document(request: ContractRequest):
     except requests.exceptions.RequestException as e:
         return {"error": f"문서 생성 요청 실패: {e}"}
 
+# ✅ Cloudtype에서 `/download/{file_name}` 엔드포인트 추가
+@app.get("/download/{file_name}")
+async def download_file(file_name: str):
+    """✅ Cloudtype에서 직접 PDF 다운로드 제공"""
+    file_path = os.path.join(DOWNLOAD_DIR, file_name)
+
+    if not os.path.exists(file_path):
+        logging.error(f"❌ 다운로드 요청한 파일이 존재하지 않음: {file_name}")
+        return JSONResponse(content={"error": "파일이 존재하지 않습니다."}, status_code=404)
+
+    logging.info(f"✅ Cloudtype에서 PDF 다운로드 요청: {file_name}")
+    return FileResponse(file_path, media_type="application/pdf", filename=file_name)
+
 if __name__ == "__main__":
     logging.info("🚀 FastAPI 서버 시작됨 (Cloudtype 환경에서 실행 중)")
-    uvicorn.run(app, host="0.0.0.0", port=8000, timeout_keep_alive=300, log_level="info")
+
+    # ✅ Cloudtype에서 `download/` 폴더 생성 (최초 실행 시)
+    os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+    uvicorn.run(app, host="0.0.0.0", port=8000, timeout_keep_alive=300)
