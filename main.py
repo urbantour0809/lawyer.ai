@@ -76,7 +76,7 @@ async def generate_document(request: ContractRequest):
     logging.info(f"🔄 로컬 GPU 서버로 문서 생성 요청 전송: {target_url}")
 
     try:
-        response = requests.post(target_url, json=request.model_dump(), timeout=240)
+        response = requests.post(target_url, json=request.model_dump(), timeout=300)
 
         if response.status_code == 200:
             return response.json()
