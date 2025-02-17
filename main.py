@@ -73,12 +73,11 @@ async def ask_question(request: QueryRequest):
         logging.error("❌ LOCAL_GPU_SERVER 환경 변수가 설정되지 않음")
         return {"error": "서버 설정 오류: LOCAL_GPU_SERVER 환경 변수가 없습니다."}
 
-    # ✅ 요청을 보내기 전에 URL 로그 출력
     target_url = f"{LOCAL_GPU_SERVER}/gpu_ask"
     logging.info(f"🔄 로컬 GPU 서버로 요청 전송: {target_url}")
 
     try:
-        response = requests.post(target_url, json={"question": user_query}, timeout=60)
+        response = requests.post(target_url, json={"question": user_query}, timeout=180)
 
         if response.status_code == 200:
             logging.info(f"✅ 로컬 GPU 서버 응답 성공")
@@ -86,14 +85,6 @@ async def ask_question(request: QueryRequest):
         else:
             logging.error(f"❌ 로컬 GPU 서버 응답 실패 - 상태 코드: {response.status_code}")
             return {"error": f"로컬 GPU 서버 오류: {response.status_code}", "details": response.text}
-
-    except requests.exceptions.ConnectionError:
-        logging.exception("❌ 로컬 GPU 서버에 연결할 수 없음")
-        return {"error": "로컬 GPU 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요."}
-
-    except requests.exceptions.Timeout:
-        logging.exception("❌ 로컬 GPU 서버 응답 시간 초과")
-        return {"error": "로컬 GPU 서버 응답 시간이 초과되었습니다."}
 
     except requests.exceptions.RequestException as e:
         logging.exception("❌ 로컬 GPU 서버 요청 실패")
@@ -108,12 +99,11 @@ async def generate_document(request: ContractRequest):
         logging.error("❌ LOCAL_GPU_SERVER 환경 변수가 설정되지 않음")
         return {"error": "서버 설정 오류: LOCAL_GPU_SERVER 환경 변수가 없습니다."}
 
-    # ✅ 로컬 GPU 서버의 문서 생성 API 호출
     target_url = f"{LOCAL_GPU_SERVER}/generate-document"
     logging.info(f"🔄 로컬 GPU 서버로 문서 생성 요청 전송: {target_url}")
 
     try:
-        response = requests.post(target_url, json=request.dict(), timeout=60)
+        response = requests.post(target_url, json=request.model_dump(), timeout=180)
 
         if response.status_code == 200:
             logging.info(f"✅ 문서 생성 성공")
@@ -121,14 +111,6 @@ async def generate_document(request: ContractRequest):
         else:
             logging.error(f"❌ 문서 생성 실패 - 상태 코드: {response.status_code}")
             return {"error": f"문서 생성 오류: {response.status_code}", "details": response.text}
-
-    except requests.exceptions.ConnectionError:
-        logging.exception("❌ 로컬 GPU 서버에 연결할 수 없음")
-        return {"error": "로컬 GPU 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요."}
-
-    except requests.exceptions.Timeout:
-        logging.exception("❌ 로컬 GPU 서버 응답 시간 초과")
-        return {"error": "로컬 GPU 서버 응답 시간이 초과되었습니다."}
 
     except requests.exceptions.RequestException as e:
         logging.exception("❌ 문서 생성 요청 실패")
