@@ -95,4 +95,4 @@ async def generate_document(request: ContractRequest):
 
 if __name__ == "__main__":
     logging.info("🚀 FastAPI 서버 시작됨 (로컬에서 실행 중)")
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run(app, host="0.0.0.0", port=8001, timeout_keep_alive=300)
