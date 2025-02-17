@@ -4,7 +4,7 @@ import logging
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import uvicorn
 
@@ -35,6 +35,14 @@ app.add_middleware(
 # ✅ Cloudtype의 `download/` 폴더 설정
 DOWNLOAD_DIR = os.path.abspath("download")
 os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
+# ✅ `ContractRequest` 모델 추가 (서버와 동일한 모델 필요)
+class ContractRequest(BaseModel):
+    contract_type: str
+    party_a: str
+    party_b: str
+    contract_date: str
+    additional_info: str = ""
 
 # ✅ 로컬 GPU 서버 주소 가져오기
 LOCAL_GPU_SERVER = os.getenv("LOCAL_GPU_SERVER", "").strip()
@@ -77,4 +85,4 @@ async def generate_document(request: ContractRequest):
 
 if __name__ == "__main__":
     logging.info("🚀 FastAPI 서버 시작됨 (Cloudtype 환경에서 실행 중)")
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8000, timeout_keep_alive=300, log_level="info")
