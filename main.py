@@ -32,9 +32,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ `download/` 폴더 생성 (Cloudtype에서 파일 제공)
-DOWNLOAD_DIR = "download"
-os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+# ✅ Cloudtype의 `download/` 폴더를 절대경로로 설정
+DOWNLOAD_DIR = os.path.abspath("download")
 
 # ✅ 요청 받을 데이터 모델 정의
 class ContractRequest(BaseModel):
@@ -76,7 +75,7 @@ async def generate_document(request: ContractRequest):
     logging.info(f"🔄 로컬 GPU 서버로 문서 생성 요청 전송: {target_url}")
 
     try:
-        response = requests.post(target_url, json=request.model_dump(), timeout=300)
+        response = requests.post(target_url, json=request.dict(), timeout=300)
 
         if response.status_code == 200:
             return response.json()
@@ -92,7 +91,7 @@ async def download_file(file_name: str):
     """
     ✅ Cloudtype에서 직접 PDF 다운로드 제공
     """
-    file_path = os.path.abspath(os.path.join(DOWNLOAD_DIR, file_name))
+    file_path = os.path.join(DOWNLOAD_DIR, file_name)
 
     if not os.path.exists(file_path):
         logging.error(f"❌ 다운로드 요청한 파일이 존재하지 않음: {file_name}")
@@ -103,4 +102,8 @@ async def download_file(file_name: str):
 
 if __name__ == "__main__":
     logging.info("🚀 FastAPI 서버 시작됨 (Cloudtype 환경에서 실행 중)")
+
+    # ✅ Cloudtype에서 `download/` 폴더 생성 (최초 실행 시)
+    os.makedirs(DOWNLOAD_DIR, exist_ok=True)
+
     uvicorn.run(app, host="0.0.0.0", port=8000)
