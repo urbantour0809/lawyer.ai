@@ -2,9 +2,9 @@ import os
 import requests
 import logging
 from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 import uvicorn
 
@@ -33,10 +33,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ 로컬 서버에서 사용할 `download/` 폴더 설정
-DOWNLOAD_DIR = os.path.abspath("download")
-os.makedirs(DOWNLOAD_DIR, exist_ok=True)
-
 # ✅ 로컬 GPU 서버 (ngrok URL) 가져오기
 LOCAL_GPU_SERVER = os.getenv("LOCAL_GPU_SERVER", "").strip()
 
@@ -51,7 +47,6 @@ if LOCAL_GPU_SERVER and not LOCAL_GPU_SERVER.startswith(("http://", "https://"))
 class QueryRequest(BaseModel):
     question: str
 
-# ✅ 요청 받을 데이터 모델 정의
 class ContractRequest(BaseModel):
     contract_type: str
     party_a: str
@@ -97,37 +92,34 @@ async def ask_question(request: QueryRequest):
         logging.exception("❌ 로컬 GPU 서버 요청 실패")
         return {"error": f"로컬 GPU 서버 요청 실패: {e}"}
 
-# ✅ 문서 생성 요청을 로컬 GPU 서버에서 처리
+# ✅ SSE를 이용한 문서 생성 상태 스트리밍
 @app.post("/generate-document")
 async def generate_document(request: ContractRequest):
-    """✅ 로컬 GPU 서버에 문서 생성 요청 전송"""
-    logging.info(f"📄 문서 생성 요청 받음: {request}")
+    """✅ SSE(Server-Sent Events) 방식으로 문서 생성 상태 업데이트"""
 
-    if not LOCAL_GPU_SERVER:
-        return {"error": "서버 설정 오류: LOCAL_GPU_SERVER 환경 변수가 없습니다."}
+    async def event_stream():
+        try:
+            yield "data: 문서 생성 요청을 처리 중입니다...\n\n"
+            
+            target_url = f"{LOCAL_GPU_SERVER}/generate-document"
+            logging.info(f"🔄 로컬 GPU 서버로 문서 생성 요청 전송: {target_url}")
 
-    target_url = f"{LOCAL_GPU_SERVER}/generate-document"
-    logging.info(f"🔄 로컬 GPU 서버로 문서 생성 요청 전송: {target_url}")
+            with requests.post(target_url, json=request.model_dump(), stream=True, timeout=600) as response:
+                if response.status_code == 200:
+                    for line in response.iter_lines():
+                        if line:
+                            yield f"data: {line.decode('utf-8')}\n\n"
 
-    try:
-        response = requests.post(target_url, json=request.model_dump(), timeout=300)
+                else:
+                    logging.error(f"❌ 문서 생성 실패 - 상태 코드: {response.status_code}")
+                    yield f"data: 오류 발생 - 상태 코드: {response.status_code}\n\n"
 
-        if response.status_code == 200:
-            result = response.json()
+        except requests.exceptions.RequestException as e:
+            logging.exception("❌ 문서 생성 요청 실패")
+            yield f"data: 문서 생성 중 오류 발생: {str(e)}\n\n"
 
-            # ✅ 다운로드 링크 수정 (localhost → ngrok URL)
-            if "download_link" in result:
-                result["download_link"] = result["download_link"].replace("http://localhost:8001", LOCAL_GPU_SERVER)
-                logging.info(f"🔗 수정된 다운로드 링크: {result['download_link']}")
-
-            return result
-
-        else:
-            return {"error": f"문서 생성 오류: {response.status_code}", "details": response.text}
-
-    except requests.exceptions.RequestException as e:
-        return {"error": f"문서 생성 요청 실패: {e}"}
+    return StreamingResponse(event_stream(), media_type="text/event-stream")
 
 if __name__ == "__main__":
     logging.info("🚀 FastAPI 서버 시작됨 (로컬에서 실행 중)")
-    uvicorn.run(app, host="0.0.0.0", port=8001, timeout_keep_alive=300)
+    uvicorn.run(app, host="0.0.0.0", port=8001)
