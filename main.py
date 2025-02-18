@@ -47,11 +47,16 @@ if LOCAL_GPU_SERVER and not LOCAL_GPU_SERVER.startswith(("http://", "https://"))
     LOCAL_GPU_SERVER = "http://" + LOCAL_GPU_SERVER
     logging.warning(f"⚠️ LOCAL_GPU_SERVER에 스키마가 없어서 자동 추가됨: {LOCAL_GPU_SERVER}")
 
+# ✅ `LOCAL_GPU_SERVER` 값을 제공하는 엔드포인트 추가
+@app.get("/get-local-gpu-server")
+async def get_local_gpu_server():
+    """✅ `LOCAL_GPU_SERVER` 값을 반환하는 엔드포인트"""
+    return {"LOCAL_GPU_SERVER": LOCAL_GPU_SERVER}
+
 # ✅ 요청 받을 데이터 모델 정의
 class QueryRequest(BaseModel):
     question: str
 
-# ✅ 요청 받을 데이터 모델 정의
 class ContractRequest(BaseModel):
     contract_type: str
     party_a: str
