@@ -11,6 +11,7 @@ from search import get_relevant_docs
 from answer import generate_answer
 from doc_create import create_contract_pdf, get_document_path  # ✅ 경로 함수 가져오기
 import uvicorn
+import requests
 
 # ✅ 환경 변수 로드
 load_dotenv()
@@ -117,20 +118,31 @@ class ContractRequest(BaseModel):
     party_b: str
     contract_date: str
     additional_info: str = ""
+    server_url: str  # main.py의 URL을 받기 위한 필드 추가
 
 @app.post("/generate-document")
 async def generate_contract(data: ContractRequest):
     """✅ 계약서를 생성하고 PDF 파일을 document/ 폴더에 저장"""
     logging.info(f"📝 문서 생성 요청 받음: {data}")
 
-    if not SERVER_URL:
-        logging.error("❌ SERVER_URL이 설정되지 않았습니다.")
-        return JSONResponse(
-            content={"error": "서버 URL이 설정되지 않았습니다."}, 
-            status_code=500
-        )
-
     try:
+        # ✅ main.py로부터 서버 URL 받아오기
+        response = requests.get(f"{data.server_url}/get-local-gpu-server")
+        if response.status_code != 200:
+            logging.error("❌ 서버 URL을 받아오는데 실패했습니다.")
+            return JSONResponse(
+                content={"error": "서버 URL을 받아오는데 실패했습니다."}, 
+                status_code=500
+            )
+        
+        server_url = response.json()["LOCAL_GPU_SERVER"]
+        if not server_url:
+            logging.error("❌ 유효하지 않은 서버 URL입니다.")
+            return JSONResponse(
+                content={"error": "유효하지 않은 서버 URL입니다."}, 
+                status_code=500
+            )
+
         # ✅ PDF 생성
         pdf_path = create_contract_pdf(
             data.contract_type, data.party_a, data.party_b, data.contract_date, data.additional_info
@@ -143,7 +155,7 @@ async def generate_contract(data: ContractRequest):
         logging.info(f"✅ PDF 저장 완료: {new_pdf_path}")
 
         # ✅ 동적 다운로드 URL 생성
-        download_link = f"{SERVER_URL}/document/{file_name}"
+        download_link = f"{server_url}/document/{file_name}"
         logging.info(f"🔗 다운로드 링크 생성 완료: {download_link}")
 
         return JSONResponse(content={"message": "문서가 생성되었습니다.", "download_link": download_link})

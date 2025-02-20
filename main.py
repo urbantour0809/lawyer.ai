@@ -112,10 +112,15 @@ async def generate_document(request: ContractRequest):
         return {"error": "서버 설정 오류: LOCAL_GPU_SERVER 환경 변수가 없습니다."}
 
     target_url = f"{LOCAL_GPU_SERVER}/generate-document"
+    
+    # ✅ 요청 데이터에 main.py의 URL 추가
+    request_data = request.model_dump()
+    request_data["server_url"] = os.getenv("SERVER_URL", "http://localhost:8000")  # Cloudtype 서버 URL
+    
     logging.info(f"🔄 로컬 GPU 서버로 문서 생성 요청 전송: {target_url}")
 
     try:
-        response = requests.post(target_url, json=request.model_dump(), timeout=600)  # ⬅️ 타임아웃 600초 설정
+        response = requests.post(target_url, json=request_data, timeout=600)
 
         if response.status_code == 200:
             return response.json()
