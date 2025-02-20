@@ -113,9 +113,9 @@ async def generate_document(request: ContractRequest):
 
     target_url = f"{LOCAL_GPU_SERVER}/generate-document"
     
-    # ✅ 요청 데이터에 main.py의 URL 추가
+    # ✅ 요청 데이터에 Cloudtype의 실제 URL 추가
     request_data = request.model_dump()
-    request_data["server_url"] = os.getenv("SERVER_URL", "http://localhost:8000")  # Cloudtype 서버 URL
+    request_data["server_url"] = os.getenv("CLOUDTYPE_URL", "https://port-0-lawyer-ai-m2eej1jqd8b44d66.sel4.cloudtype.app")  # Cloudtype URL
     
     logging.info(f"🔄 로컬 GPU 서버로 문서 생성 요청 전송: {target_url}")
 
