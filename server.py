@@ -126,22 +126,8 @@ async def generate_contract(data: ContractRequest):
     logging.info(f"📝 문서 생성 요청 받음: {data}")
 
     try:
-        # ✅ main.py로부터 서버 URL 받아오기
-        response = requests.get(f"{data.server_url}/get-local-gpu-server")
-        if response.status_code != 200:
-            logging.error("❌ 서버 URL을 받아오는데 실패했습니다.")
-            return JSONResponse(
-                content={"error": "서버 URL을 받아오는데 실패했습니다."}, 
-                status_code=500
-            )
-        
-        server_url = response.json()["LOCAL_GPU_SERVER"]
-        if not server_url:
-            logging.error("❌ 유효하지 않은 서버 URL입니다.")
-            return JSONResponse(
-                content={"error": "유효하지 않은 서버 URL입니다."}, 
-                status_code=500
-            )
+        # ✅ LOCAL_GPU_SERVER를 직접 전달받도록 수정
+        server_url = data.server_url  # 여기서 data.server_url이 이미 LOCAL_GPU_SERVER 값임
 
         # ✅ PDF 생성
         pdf_path = create_contract_pdf(
@@ -150,11 +136,9 @@ async def generate_contract(data: ContractRequest):
         file_name = os.path.basename(pdf_path)
         new_pdf_path = get_document_path(file_name)
 
-        # ✅ 파일 이동
         shutil.move(pdf_path, new_pdf_path)
         logging.info(f"✅ PDF 저장 완료: {new_pdf_path}")
 
-        # ✅ 동적 다운로드 URL 생성
         download_link = f"{server_url}/document/{file_name}"
         logging.info(f"🔗 다운로드 링크 생성 완료: {download_link}")
 

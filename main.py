@@ -113,15 +113,14 @@ async def generate_document(request: ContractRequest):
 
     target_url = f"{LOCAL_GPU_SERVER}/generate-document"
     
-    # ✅ 요청 데이터에 Cloudtype의 실제 URL 추가
+    # ✅ LOCAL_GPU_SERVER를 직접 전달
     request_data = request.model_dump()
-    request_data["server_url"] = os.getenv("CLOUDTYPE_URL", "https://port-0-lawyer-ai-m2eej1jqd8b44d66.sel4.cloudtype.app")  # Cloudtype URL
+    request_data["server_url"] = LOCAL_GPU_SERVER
     
     logging.info(f"🔄 로컬 GPU 서버로 문서 생성 요청 전송: {target_url}")
 
     try:
         response = requests.post(target_url, json=request_data, timeout=600)
-
         if response.status_code == 200:
             return response.json()
         else:
@@ -129,21 +128,6 @@ async def generate_document(request: ContractRequest):
 
     except requests.exceptions.RequestException as e:
         return {"error": f"문서 생성 요청 실패: {e}"}
-
-# ✅ 서버 시작시 LOCAL_GPU_SERVER 값을 로컬 GPU 서버에 전달
-@app.on_event("startup")
-async def startup_event():
-    """서버 시작시 LOCAL_GPU_SERVER 값을 로컬 GPU 서버에 전달"""
-    if LOCAL_GPU_SERVER:
-        try:
-            setup_url = f"{LOCAL_GPU_SERVER}/set-server-url"
-            response = requests.post(setup_url, json=LOCAL_GPU_SERVER)
-            if response.status_code == 200:
-                logging.info("✅ LOCAL_GPU_SERVER 값을 로컬 서버에 성공적으로 전달했습니다.")
-            else:
-                logging.error(f"❌ LOCAL_GPU_SERVER 값 전달 실패: {response.status_code}")
-        except Exception as e:
-            logging.error(f"❌ LOCAL_GPU_SERVER 값 전달 중 오류 발생: {str(e)}")
 
 if __name__ == "__main__":
     logging.info("🚀 FastAPI 서버 시작됨 (로컬에서 실행 중)")
