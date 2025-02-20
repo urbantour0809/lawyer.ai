@@ -125,6 +125,21 @@ async def generate_document(request: ContractRequest):
     except requests.exceptions.RequestException as e:
         return {"error": f"문서 생성 요청 실패: {e}"}
 
+# ✅ 서버 시작시 LOCAL_GPU_SERVER 값을 로컬 GPU 서버에 전달
+@app.on_event("startup")
+async def startup_event():
+    """서버 시작시 LOCAL_GPU_SERVER 값을 로컬 GPU 서버에 전달"""
+    if LOCAL_GPU_SERVER:
+        try:
+            setup_url = f"{LOCAL_GPU_SERVER}/set-server-url"
+            response = requests.post(setup_url, json=LOCAL_GPU_SERVER)
+            if response.status_code == 200:
+                logging.info("✅ LOCAL_GPU_SERVER 값을 로컬 서버에 성공적으로 전달했습니다.")
+            else:
+                logging.error(f"❌ LOCAL_GPU_SERVER 값 전달 실패: {response.status_code}")
+        except Exception as e:
+            logging.error(f"❌ LOCAL_GPU_SERVER 값 전달 중 오류 발생: {str(e)}")
+
 if __name__ == "__main__":
     logging.info("🚀 FastAPI 서버 시작됨 (로컬에서 실행 중)")
     uvicorn.run(app, host="0.0.0.0", port=8001)
